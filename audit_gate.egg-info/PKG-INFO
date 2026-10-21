@@ -1,0 +1,29 @@
+Metadata-Version: 2.4
+Name: audit-gate
+Version: 1.0.0
+Summary: Multi-tool SAST quality gates with auto-fix for Hermes
+Author-email: Hermes Agent <hermes@nousresearch.com>
+License: MIT
+Keywords: sast,quality-gate,auto-fix,security,linting
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Topic :: Software Development :: Quality Assurance
+Classifier: Topic :: Security
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: click>=8.0
+Requires-Dist: pyyaml>=6.0
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0; extra == "dev"
+Requires-Dist: pytest-cov>=4.0; extra == "dev"
+Requires-Dist: ruff>=0.5; extra == "dev"
+Requires-Dist: pyright>=1.1; extra == "dev"
+Requires-Dist: bandit>=1.7; extra == "dev"
+Requires-Dist: radon>=6.0; extra == "dev"
+Requires-Dist: semgrep>=1.0; extra == "dev"
+Requires-Dist: pip-audit>=2.7; extra == "dev"
+Requires-Dist: vulture>=2.10; extra == "dev"

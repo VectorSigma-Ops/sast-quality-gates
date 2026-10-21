@@ -1,0 +1,76 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "audit-gate"
+version = "1.0.0"
+description = "Multi-tool SAST quality gates with auto-fix for Hermes"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [{name = "Hermes Agent", email = "hermes@nousresearch.com"}]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Security",
+]
+keywords = ["sast", "quality-gate", "auto-fix", "security", "linting"]
+requires-python = ">=3.11"
+dependencies = [
+    "click>=8.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "ruff>=0.5",
+    "pyright>=1.1",
+    "bandit>=1.7",
+    "radon>=6.0",
+    "semgrep>=1.0",
+    "pip-audit>=2.7",
+    "vulture>=2.10",
+]
+
+[project.scripts]
+audit_gate = "audit_gate.cli:cli"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["audit_gate*"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+select = ["E", "F", "I", "UP", "B", "C4", "ARG", "PTH", "T20", "SIM"]
+ignore = ["S101", "B011", "ARG001", "ARG002"]
+extend-exclude = ["__pycache__", ".git", "templates", "references"]
+
+[tool.ruff.per-file-ignores]
+"audit_gate/parsers/*.py" = ["E501", "T201", "SIM118"]
+"audit_gate/cli.py" = ["E501", "T201"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --cov=audit_gate --cov-fail-under=35 --cov-config=.coveragerc"
+
+[tool.coverage.run]
+source = ["audit_gate"]
+omit = ["tests/*", "*/__pycache__/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]

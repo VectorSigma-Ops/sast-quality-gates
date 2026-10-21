@@ -1,0 +1,13 @@
+click>=8.0
+pyyaml>=6.0
+
+[dev]
+pytest>=7.0
+pytest-cov>=4.0
+ruff>=0.5
+pyright>=1.1
+bandit>=1.7
+radon>=6.0
+semgrep>=1.0
+pip-audit>=2.7
+vulture>=2.10

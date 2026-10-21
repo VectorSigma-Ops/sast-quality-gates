@@ -1,0 +1,2 @@
+[console_scripts]
+audit_gate = audit_gate.cli:cli
