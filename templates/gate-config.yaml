@@ -1,0 +1,59 @@
+# Gate Configuration Template
+
+```yaml
+# sast-gate-config.yaml
+# Copy to project root and customize
+
+thresholds:
+  max_findings: 0
+  max_critical: 0
+  max_high: 5
+  max_medium: 20
+  max_low: 100
+
+block_on_tool_failure: true
+
+cache:
+  enabled: true
+  ttl_seconds: 3600
+  path: "~/.cache/audit_gate"
+
+tools:
+  ruff:
+    enabled: true
+    config: "pyproject.toml"
+  pyright:
+    enabled: true
+    config: "pyproject.toml"
+  bandit:
+    enabled: true
+    config: ".bandit"
+  radon:
+    enabled: true
+    min_complexity: 10
+  semgrep:
+    enabled: true
+    config: "auto"
+  pip_audit:
+    enabled: true
+  vulture:
+    enabled: true
+
+# Auto-fix engine config (hermes-auto-fix)
+auto_fix:
+  enabled: true
+  max_iterations: 2
+  max_fixes_per_iteration: 10
+  confidence_threshold: 0.8
+  run_tests_on_fix: false
+  excluded_patterns:
+    - "**/hooks/*"
+    - "**/patches/*"
+    - "**/tests/**"
+    - "**/scripts/**"
+
+# Output formats
+output:
+  format: "json"  # json, text, github, sarif
+  file: null  # stdout if null
+```

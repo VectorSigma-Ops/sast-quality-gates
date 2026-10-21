@@ -1,0 +1,104 @@
+# Hermes Plugin Template for SAST Quality Gate
+
+```yaml
+# plugin.yaml
+# Place in ~/.hermes/plugins/sast-quality-gate/plugin.yaml
+# or in skill directory for auto-discovery
+
+name: sast-quality-gate
+version: 3.0.0
+description: Multi-tool SAST quality gate with auto-fix
+author: Hermes Agent
+license: MIT
+
+# Hook declarations
+hooks:
+  # Runs on git commit - checks staged files
+  pre_commit: sast_quality_gate.hooks:pre_commit_hook
+  
+  # Runs on git push - checks pushed files
+  pre_push: sast_quality_gate.hooks:pre_push_hook
+  
+  # Runs when gate fails - triggers auto-fix
+  post_gate_fail: sast_quality_gate.hooks:post_gate_fail_hook
+
+# Middleware for telemetry
+middleware:
+  - sast_quality_gate.middleware:telemetry_middleware
+
+# Configuration schema for Hermes UI
+config_schema:
+  type: object
+  properties:
+    thresholds:
+      type: object
+      description: Gate threshold overrides
+      properties:
+        max_findings:
+          type: integer
+          default: 0
+          description: Global max findings (0 = disabled)
+        max_critical:
+          type: integer
+          default: 0
+        max_high:
+          type: integer
+          default: 5
+        max_medium:
+          type: integer
+          default: 20
+        max_low:
+          type: integer
+          default: 100
+    block_on_tool_failure:
+      type: boolean
+      default: true
+      description: Fail gate if any tool not installed or crashes
+    cache:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          default: true
+        ttl_seconds:
+          type: integer
+          default: 3600
+        path:
+          type: string
+          default: "~/.cache/audit_gate"
+    auto_fix:
+      type: object
+      description: Auto-fix engine settings
+      properties:
+        enabled:
+          type: boolean
+          default: true
+        max_iterations:
+          type: integer
+          default: 2
+        max_fixes_per_iteration:
+          type: integer
+          default: 10
+        confidence_threshold:
+          type: number
+          default: 0.8
+        excluded_patterns:
+          type: array
+          items:
+            type: string
+          default:
+            - "**/hooks/*"
+            - "**/patches/*"
+            - "**/tests/**"
+            - "**/scripts/**"
+
+# Required tools (verified at startup)
+required_tools:
+  - ruff
+  - pyright
+  - bandit
+  - radon
+  - semgrep
+  - pip-audit
+  - vulture
+```
