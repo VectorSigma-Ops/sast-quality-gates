@@ -26,6 +26,14 @@ metadata:
 - Use `_resolve_tool_path()` in parsers/base.py: checks PATH first, then `sys.executable.parent` for tool binaries
 - `semgrep` and `pip-audit` expose CLI only (`semgrep`, `pip-audit`), not `python -m` modules — parsers must call CLI directly
 - Verify all 7 tools with: `for t in ruff pyright bandit radon semgrep pip-audit vulture; do python -m $t --version || $t --version; done`
+- **Hermes Python dynamic detection**: The Python binary path contains literal asterisks (`python-3.14.7+202****0901-linux-x64`). In bash hooks, use dynamic resolution:
+  ```bash
+  INSTALL_PYTHON=$(find /home/hermes/.hermes/tools -maxdepth 4 -name "python3*" -type f -executable 2>/dev/null | grep -E "python3\.[0-9]+" | head -1)
+  if [ -z "$INSTALL_PYTHON" ]; then
+      INSTALL_PYTHON="/usr/bin/python3"
+  fi
+  ```
+- **Install audit_gate for Hermes Python**: `pip install -e /home/hermes/.hermes/skills/sast-quality-gates --break-system-packages` using the Hermes Python binary
 
 ### 2. Parser Implementation
 - Each tool gets a parser in `parsers/<tool>.py` implementing `build_command()` and `parse_output()`
@@ -33,6 +41,8 @@ metadata:
 - Map tool-specific severity to normalized: critical, high, medium, low, info
 - Use `safe_json_parse()` for robust JSON extraction from stdout
 - Status codes: SUCCESS, FAILED, NOT_INSTALLED
+- **Parser class naming**: Use `XxxParser` pattern (e.g., `RuffParser`, `PipAuditParser`, `SemgrepParser`) — `pip_audit` module maps to `PipAuditParser` class, not `Pip_auditParser`
+- **CLI module path**: Import as `from .parsers import ruff, pyright, bandit, radon, semgrep, pip_audit, vulture` — each parser module exports its class
 
 ### 3. Gate Configuration
 - **Per-tool severity mapping is critical**: normalize each tool's native severity to the global scale based on what the severity MEANS for that tool, not 1:1 mapping. Bandit HIGH = critical (security vuln), semgrep ERROR = critical. Radon HIGH = refactoring guidance only.
@@ -62,7 +72,56 @@ def map_radon_severity(complexity: int) -> str:
     return "low"
 ```
 
-### 4. Parallel Execution
+### 5. CLI Commands
+The `audit_gate.cli` module exposes four commands:
+
+- `audit_gate gate <dir> [--format text|json|github|sarif] [--tools <list>] [--config <file>] [--fail-fast] [--cache/--no-cache]`
+  Runs the full quality gate on a directory. Discovers all `*.py` files, runs selected tools in parallel, evaluates per-tool and global thresholds. Exit code 0=PASS, 1=FAIL.
+
+- `audit_gate check-tools <dir> [--tools <list>]`
+  Verifies all SAST tools are installed and functional. Prints version for each tool. Exit code 0 if all present, 1 if any missing.
+
+- `audit_gate validate-release <tag>`
+  Validates release tag format: `project-vX.Y.Z[-prerelease]`. Exit code 0 if valid, 1 if invalid.
+
+- `audit_gate validate-commit <commit_file> [--fix]`
+  Validates commit message format: `type(scope): subject`. Types: feat, fix, docs, style, refactor, test, chore, build, ci, perf. Scope required (2-20 chars `[a-z0-9-]`). Subject max 72 chars. With `--fix`, auto-corrects missing scope/type.
+
+All commands are invoked via `python -m audit_gate.cli <command>` or the installed `audit_gate` entry point.
+
+### 6. Hermes Hook Integration
+Hook entry points in `hooks/`:
+
+- `hooks/pre_commit.py` — Runs `audit_gate.cli gate .` on all Python files (pre-commit)
+- `hooks/pre_push.py` — Runs security-only gate (`bandit,semgrep,pip_audit`) on branch push, full gate on tag push
+
+**Integration pattern for project-standards hooks**:
+```bash
+# In .git/hooks/pre-commit, .git/hooks/pre-push, .git/hooks/commit-msg:
+INSTALL_PYTHON=$(find /home/hermes/.hermes/tools -maxdepth 4 -name "python3*" -type f -executable 2>/dev/null | grep -E "python3\.[0-9]+" | head -1)
+if [ -z "$INSTALL_PYTHON" ]; then
+    INSTALL_PYTHON="/usr/bin/python3"
+fi
+export PYTHONPATH="/home/hermes/.hermes/skills/infrastructure/project-standards-skill-project-standards:${PYTHONPATH}"
+exec "$INSTALL_PYTHON" -m audit_gate.cli gate . --format text
+```
+
+- **Dynamic Python detection** avoids hardcoded paths with glob `****` issues
+- **PYTHONPATH export** ensures skill modules and dependencies are importable
+- **Module invocation**: Use `python -m audit_gate.cli` not `python -m audit_gate` (package cannot be directly executed)
+- **Pre-push security-first**: Run security tools (bandit, semgrep, pip_audit) first on branch pushes; full gate on tag pushes and final validation
+- **Commit-msg integration**: Use `audit_gate.cli validate-commit "$1" --fix` for auto-fix of commit messages
+
+### 7. Installation
+```bash
+# Install audit_gate for Hermes Python
+/home/hermes/.hermes/tools/python-3.14.7+*/bin/python -m pip install -e /home/hermes/.hermes/skills/sast-quality-gates --break-system-packages
+
+# Verify installation
+/home/hermes/.hermes/tools/python-3.14.7+*/bin/python -c "import audit_gate; print('OK')"
+```
+
+### 8. Parallel Execution
 - Discover Python files, run 7 tools per file in parallel (asyncio/thread pool)
 - Aggregate findings across files, evaluate thresholds per-file and global
 - Exit codes: 0=PASS, 1=FAIL (threshold breach or tool failure)

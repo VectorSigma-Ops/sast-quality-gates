@@ -42,6 +42,64 @@ async def pre_commit_hook(ctx):
         raise GateFailedError(result)
 ```
 
+### Direct Git Hooks Pattern (Recommended)
+
+**Abandon pre-commit framework for Hermes hooks** — it uses system Python (3.13) without project-standards installed. Use direct `.git/hooks/*` scripts calling Hermes Python (3.14.7) with exported PYTHONPATH.
+
+```bash
+# .git/hooks/pre-commit
+#!/bin/bash
+INSTALL_PYTHON=$(find /home/hermes/.hermes/tools -maxdepth 4 -name "python3*" -type f -executable 2>/dev/null | grep -E "python3\.[0-9]+" | head -1)
+if [ -z "$INSTALL_PYTHON" ]; then
+    INSTALL_PYTHON="/usr/bin/python3"
+fi
+export PYTHONPATH="/home/hermes/.hermes/skills/infrastructure/project-standards-skill-project-standards:${PYTHONPATH}"
+exec "$INSTALL_PYTHON" -m audit_gate.cli gate . --format text
+```
+
+```bash
+# .git/hooks/commit-msg
+#!/bin/bash
+INSTALL_PYTHON=$(find /home/hermes/.hermes/tools -maxdepth 4 -name "python3*" -type f -executable 2>/dev/null | grep -E "python3\.[0-9]+" | head -1)
+if [ -z "$INSTALL_PYTHON" ]; then
+    INSTALL_PYTHON="/usr/bin/python3"
+fi
+export PYTHONPATH="/home/hermes/.hermes/skills/infrastructure/project-standards-skill-project-standards:${PYTHONPATH}"
+COMMIT_MSG_FILE="$1"
+exec "$INSTALL_PYTHON" -m audit_gate.cli validate-commit "$COMMIT_MSG_FILE" --fix
+```
+
+```bash
+# .git/hooks/pre-push
+#!/bin/bash
+INSTALL_PYTHON=$(find /home/hermes/.hermes/tools -maxdepth 4 -name "python3*" -type f -executable 2>/dev/null | grep -E "python3\.[0-9]+" | head -1)
+if [ -z "$INSTALL_PYTHON" ]; then
+    INSTALL_PYTHON="/usr/bin/python3"
+fi
+export PYTHONPATH="/home/hermes/.hermes/skills/infrastructure/project-standards-skill-project-standards:${PYTHONPATH}"
+
+# Read stdin for push refs
+while read local_ref local_sha remote_ref remote_sha; do
+    if echo "$local_ref" | grep -q "^refs/tags/"; then
+        TAG_NAME=$(echo "$local_ref" | sed 's|refs/tags/||')
+        "$INSTALL_PYTHON" -m audit_gate.cli validate-release "$TAG_NAME" || exit 1
+    elif echo "$local_ref" | grep -q "^refs/heads/"; then
+        BRANCH_NAME=$(echo "$local_ref" | sed 's|refs/heads/||')
+        "$INSTALL_PYTHON" -m audit_gate.cli gate . --tools "bandit,semgrep,pip_audit" --format text || exit 1
+    fi
+done
+
+exec "$INSTALL_PYTHON" -m audit_gate.cli gate . --format text
+```
+
+**Key differences from pre-commit framework**:
+- No framework intermediary — hooks call Hermes Python directly
+- Dynamic Python detection avoids hardcoded paths with glob `****` issues
+- PYTHONPATH export ensures skill modules and dependencies are importable
+- Module invocation: `python -m audit_gate.cli` not `python -m audit_gate`
+- Security-first on branch pushes (bandit, semgrep, pip_audit only), full gate on final validation
+- Commit-msg hook receives commit message file as `$1`
+
 ### pre_push_hook (with auto-remediation)
 The pre-push hook with auto-remediation uses a bash wrapper script for full-project audit + auto-fix:
 
